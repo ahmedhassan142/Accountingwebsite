@@ -252,16 +252,16 @@ export default function BlogPage() {
                     New
                   </span>
                 </div>
-                <Link 
+                {/* <Link 
                   href={`/blog/${featuredPost.slug}`} 
                   className="text-yellow-500 hover:text-yellow-600 font-semibold flex items-center group"
                 >
                   View All Features
                   <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                </Link> */}
               </div>
 
-              <Link href={`/blog/${featuredPost.slug}`} className="group">
+              <Link href={`/Blogs/${featuredPost.slug}`} className="group">
                 <div className="grid lg:grid-cols-2 gap-8 bg-gradient-to-br from-gray-50 to-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500">
                   {/* Image Section */}
                   <div className="relative h-[400px] lg:h-full overflow-hidden">
@@ -363,18 +363,18 @@ export default function BlogPage() {
                   Trending <span className="text-yellow-500">Now</span>
                 </h2>
               </div>
-              <Link 
+              {/* <Link 
                 href="/blog/trending" 
                 className="text-yellow-500 hover:text-yellow-600 font-semibold flex items-center group"
               >
                 View All Trending
                 <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-              </Link>
+              </Link> */}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {trendingPosts.map((post, index) => (
-                <Link key={post.id} href={`/blog/${post.slug}`} className="group">
+                <Link key={post.id} href={`/Blogs/${post.slug}`} className="group">
                   <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                     <div className="relative h-40 overflow-hidden">
                       <Image
@@ -806,7 +806,7 @@ export default function BlogPage() {
                         </div>
 
                         {/* Title */}
-                        <Link href={`/blog/${post.slug}`} className="block">
+                        <Link href={`/Blogs/${post.slug}`} className="block">
                           <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-yellow-500 transition-colors line-clamp-2">
                             {post.title}
                           </h3>
@@ -852,7 +852,7 @@ export default function BlogPage() {
                             </div>
                           </div>
                           <Link
-                            href={`/blog/${post.slug}`}
+                            href={`/Blogs/${post.slug}`}
                             className="inline-flex items-center text-yellow-500 font-semibold group-hover:text-yellow-600"
                           >
                             Read More

@@ -58,10 +58,10 @@ export default function Home() {
                 Expert accounting, tax, and consulting services tailored to help your business grow and thrive in today's competitive landscape.
               </p>
               <div className="flex flex-wrap gap-4">
-                <Link href="/contact" className="btn-primary">
+                <Link href="/Contact" className="btn-primary">
                   Get Free Consultation
                 </Link>
-                <Link href="/services" className="btn-outline text-white border-white hover:bg-white hover:text-gray-900">
+                <Link href="/Services" className="btn-outline text-white border-white hover:bg-white hover:text-gray-900">
                   Our Services
                 </Link>
               </div>

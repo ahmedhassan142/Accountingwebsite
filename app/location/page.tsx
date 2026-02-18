@@ -1,24 +1,40 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Navigation, Phone, Mail, Clock, Car, Train, Bus, Building, Users, Briefcase, Calendar, ArrowRight, CheckCircle } from 'lucide-react';
 
-// Dynamically import Leaflet components to avoid SSR issues
+// Dynamically import Leaflet components with no SSR
 const MapContainer = dynamic(() => import('react-leaflet').then((mod) => mod.MapContainer), {
   ssr: false,
-  loading: () => <div className="h-[500px] bg-gray-200 animate-pulse rounded-lg"></div>
+  loading: () => <div className="h-[500px] bg-gray-200 animate-pulse rounded-lg flex items-center justify-center">
+    <div className="text-center">
+      <div className="w-12 h-12 border-4 border-gray-300 border-t-yellow-500 rounded-full animate-spin mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading map...</p>
+    </div>
+  </div>
 });
-const TileLayer = dynamic(() => import('react-leaflet').then((mod) => mod.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then((mod) => mod.Marker), { ssr: false });
-const Popup = dynamic(() => import('react-leaflet').then((mod) => mod.Popup), { ssr: false });
+
+const TileLayer = dynamic(() => import('react-leaflet').then((mod) => mod.TileLayer), { 
+  ssr: false 
+});
+
+const Marker = dynamic(() => import('react-leaflet').then((mod) => mod.Marker), { 
+  ssr: false 
+});
+
+const Popup = dynamic(() => import('react-leaflet').then((mod) => mod.Popup), { 
+  ssr: false 
+});
 
 // Import leaflet CSS
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default marker icons in Next.js
 let L: any;
+let mapInstance: any = null;
 
 const officeLocations = [
   {
@@ -105,32 +121,53 @@ export default function LocationPage() {
   const [isClient, setIsClient] = useState(false);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState('offices');
+  const [mapKey, setMapKey] = useState(Date.now());
+  const mapRef = useRef(null);
 
+  // Initialize Leaflet only once
   useEffect(() => {
     setIsClient(true);
     
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !L) {
       import('leaflet').then((leaflet) => {
         L = leaflet.default;
-        setLeafletLoaded(true);
         
+        // Fix for default marker icons
         delete (L.Icon.Default.prototype as any)._getIconUrl;
         L.Icon.Default.mergeOptions({
           iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
           iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
           shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
         });
+        
+        setLeafletLoaded(true);
       });
     }
+
+    // Cleanup function to destroy map instance
+    return () => {
+      if (mapInstance) {
+        try {
+          mapInstance.remove();
+          mapInstance = null;
+        } catch (e) {
+          console.log('Map cleanup error:', e);
+        }
+      }
+    };
   }, []);
 
+  // Handle location selection with map refresh
   const handleLocationSelect = (location: typeof officeLocations[0]) => {
     setSelectedLocation(location);
     setMapCenter(location.position);
+    // Force map to re-render
+    setMapKey(Date.now());
   };
 
+  // Create custom icons only when Leaflet is loaded
   const defaultIcon = useMemo(() => {
-    if (typeof window === 'undefined' || !L || !leafletLoaded) return null;
+    if (!L || !leafletLoaded) return null;
     
     return L.icon({
       iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -144,7 +181,7 @@ export default function LocationPage() {
   }, [leafletLoaded]);
 
   const selectedIcon = useMemo(() => {
-    if (typeof window === 'undefined' || !L || !leafletLoaded) return null;
+    if (!L || !leafletLoaded) return null;
     
     return L.divIcon({
       html: `
@@ -173,41 +210,84 @@ export default function LocationPage() {
     });
   }, [leafletLoaded]);
 
+  // Don't render map until client-side
+  if (!isClient) {
+    return (
+      <main className="min-h-screen bg-gray-50">
+        {/* Hero Section - Same as below but without map */}
+        <section className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white py-20">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto text-center">
+              <h1 className="text-4xl md:text-5xl font-bold mb-6">
+                Our <span className="text-yellow-500">Offices</span> Nationwide
+              </h1>
+              <p className="text-xl text-gray-300 mb-8">
+                Visit us at any of our five strategic locations across the United States. 
+                Expert financial guidance is always close to home.
+              </p>
+            </div>
+          </div>
+        </section>
+        <div className="container mx-auto px-4 py-12">
+          <div className="h-[500px] bg-gray-200 animate-pulse rounded-lg flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-gray-300 border-t-yellow-500 rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading map...</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">
+      {/* Hero Section with Background Image - FIXED OPACITY & INCREASED HEIGHT */}
+      <section className="relative pt-32 pb-32 overflow-hidden min-h-[500px] md:min-h-[550px] lg:min-h-[600px] flex items-center">
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-900/60 via-gray-900/50 to-gray-900/60 z-10"></div>
+          <Image
+            src="/images/hero/location-hero.jpg"
+            alt="Our office locations nationwide"
+            fill
+            className="object-cover"
+            priority
+            quality={95}
+            sizes="100vw"
+          />
+        </div>
+        
+        <div className="container-custom relative z-20">
+          <div className="max-w-4xl mx-auto text-center text-white">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 drop-shadow-lg">
               Our <span className="text-yellow-500">Offices</span> Nationwide
             </h1>
-            <p className="text-xl text-gray-300 mb-8">
+            <p className="text-xl text-white/90 mb-8 drop-shadow">
               Visit us at any of our five strategic locations across the United States. 
               Expert financial guidance is always close to home.
             </p>
             
             {/* Office Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
-              <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4">
+              <div className="bg-white/20 backdrop-blur-lg rounded-lg p-4 border border-white/30">
                 <Building className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
                 <div className="text-2xl font-bold">5</div>
-                <div className="text-sm text-gray-300">Offices</div>
+                <div className="text-sm text-white/80">Offices</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4">
+              <div className="bg-white/20 backdrop-blur-lg rounded-lg p-4 border border-white/30">
                 <Users className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
                 <div className="text-2xl font-bold">80+</div>
-                <div className="text-sm text-gray-300">CPAs</div>
+                <div className="text-sm text-white/80">CPAs</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4">
+              <div className="bg-white/20 backdrop-blur-lg rounded-lg p-4 border border-white/30">
                 <Briefcase className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
                 <div className="text-2xl font-bold">3,500+</div>
-                <div className="text-sm text-gray-300">Clients</div>
+                <div className="text-sm text-white/80">Clients</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4">
+              <div className="bg-white/20 backdrop-blur-lg rounded-lg p-4 border border-white/30">
                 <Calendar className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
                 <div className="text-2xl font-bold">15+</div>
-                <div className="text-sm text-gray-300">Years</div>
+                <div className="text-sm text-white/80">Years</div>
               </div>
             </div>
           </div>
@@ -309,18 +389,18 @@ export default function LocationPage() {
                 </div>
 
                 {/* Schedule Meeting */}
-                <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white">
+                {/* <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white">
                   <h3 className="text-lg font-bold mb-2">Schedule a Meeting</h3>
                   <p className="text-white/90 text-sm mb-4">
                     Book a consultation with our experts at this location
                   </p>
                   <Link 
-                    href="/contact" 
+                    href="/Contact" 
                     className="block w-full bg-white text-yellow-600 text-center px-4 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
                   >
                     Schedule Now
                   </Link>
-                </div>
+                </div> */}
               </div>
 
               {/* Map & Details */}
@@ -339,72 +419,92 @@ export default function LocationPage() {
                     </div>
                   </div>
                   
-                  <div className="h-[400px] relative">
-                    {isClient && leafletLoaded ? (
+                  <div className="h-[400px] relative" ref={mapRef}>
+                    {leafletLoaded && isClient ? (
                       <MapContainer
+                        key={mapKey}
                         center={mapCenter}
                         zoom={14}
                         style={{ height: '100%', width: '100%' }}
                         className="z-0"
+                        //@ts-ignore
+                        whenCreated={(map:any) => {
+                          mapInstance = map;
+                        }}
                       >
                         <TileLayer
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         />
-                        {officeLocations.map((location) => (
-                          <Marker
-                            key={location.id}
-                            position={location.position}
-                            icon={location.id === selectedLocation.id ? selectedIcon || defaultIcon : defaultIcon}
-                            eventHandlers={{
-                              click: () => handleLocationSelect(location),
-                            }}
-                          >
-                            <Popup>
-                              <div className="p-2">
-                                <h3 className="font-bold text-gray-900">{location.name}</h3>
-                                <p className="text-sm text-gray-600 mt-1">{location.address}</p>
-                                <p className="text-sm text-gray-600 mt-1">{location.phone}</p>
-                                <Link 
-                                  href={`https://maps.google.com/?q=${location.address}`}
-                                  target="_blank"
-                                  className="text-yellow-500 text-sm font-semibold hover:text-yellow-600 mt-2 inline-block"
-                                >
-                                  Get Directions →
-                                </Link>
-                              </div>
-                            </Popup>
-                          </Marker>
-                        ))}
+                        {officeLocations.map((location) => {
+                          const icon = location.id === selectedLocation.id 
+                            ? (selectedIcon || defaultIcon) 
+                            : defaultIcon;
+                          
+                          if (!icon) return null;
+                          
+                          return (
+                            <Marker
+                              key={location.id}
+                              position={location.position}
+                              icon={icon}
+                              eventHandlers={{
+                                click: () => handleLocationSelect(location),
+                              }}
+                            >
+                              <Popup>
+                                <div className="p-2 min-w-[200px]">
+                                  <h3 className="font-bold text-gray-900 text-lg">{location.name}</h3>
+                                  <p className="text-sm text-gray-600 mt-1">{location.address}</p>
+                                  <p className="text-sm text-gray-600 mt-1">{location.phone}</p>
+                                  <div className="mt-3 pt-2 border-t border-gray-200">
+                                    <Link 
+                                      href={`https://maps.google.com/?q=${encodeURIComponent(location.address)}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-yellow-500 text-sm font-semibold hover:text-yellow-600 inline-flex items-center"
+                                    >
+                                      Get Directions
+                                      <ArrowRight className="ml-1 w-3 h-3" />
+                                    </Link>
+                                  </div>
+                                </div>
+                              </Popup>
+                            </Marker>
+                          );
+                        })}
                       </MapContainer>
                     ) : (
                       <div className="h-full bg-gray-200 animate-pulse flex items-center justify-center">
                         <div className="text-center">
-                          <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                          <div className="text-gray-500">Loading map...</div>
+                          <div className="w-12 h-12 border-4 border-gray-300 border-t-yellow-500 rounded-full animate-spin mx-auto mb-4"></div>
+                          <div className="text-gray-600">Loading map...</div>
                         </div>
                       </div>
                     )}
                     
                     {/* Map Controls */}
-                    {isClient && (
+                    {isClient && leafletLoaded && (
                       <div className="absolute top-4 right-4 flex flex-col space-y-2 z-[1000]">
                         <button
                           onClick={() => {
                             if (navigator.geolocation) {
                               navigator.geolocation.getCurrentPosition((position) => {
                                 setMapCenter([position.coords.latitude, position.coords.longitude]);
+                                setMapKey(Date.now());
                               });
                             }
                           }}
-                          className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+                          className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200"
                           title="Find My Location"
                         >
                           <Navigation className="w-5 h-5 text-yellow-500" />
                         </button>
                         <button
-                          onClick={() => window.open(`https://maps.google.com/?q=${selectedLocation.address}`, '_blank')}
-                          className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+                          onClick={() => {
+                            window.open(`https://maps.google.com/?q=${encodeURIComponent(selectedLocation.address)}`, '_blank');
+                          }}
+                          className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200"
                           title="Open in Google Maps"
                         >
                           <MapPin className="w-5 h-5 text-yellow-500" />
@@ -414,7 +514,7 @@ export default function LocationPage() {
                   </div>
                 </div>
 
-                {/* Location Details Grid */}
+                {/* Location Details Grid - Rest of your component remains the same */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Contact Info */}
                   <div className="bg-white rounded-xl shadow-lg p-6">
@@ -462,7 +562,7 @@ export default function LocationPage() {
                       ))}
                     </div>
                     <div className="mt-4 pt-4 border-t">
-                      <Link href="/services" className="text-yellow-500 font-semibold hover:text-yellow-600 flex items-center">
+                      <Link href="/Services" className="text-yellow-500 font-semibold hover:text-yellow-600 flex items-center">
                         View All Services <ArrowRight className="w-4 h-4 ml-1" />
                       </Link>
                     </div>
@@ -474,7 +574,7 @@ export default function LocationPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[1, 2, 3, 4].map((i) => (
                         <div key={i} className="text-center">
-                          <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-2"></div>
+                          <div className="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full mx-auto mb-2"></div>
                           <p className="font-medium text-gray-900">John Doe</p>
                           <p className="text-sm text-gray-500">Senior CPA</p>
                         </div>
@@ -502,20 +602,20 @@ export default function LocationPage() {
                     { title: 'Secure Document Upload', desc: 'Share financial documents securely' },
                     { title: 'Remote Bookkeeping', desc: 'Full-service virtual bookkeeping' },
                   ].map((item, index) => (
-                    <div key={index} className="bg-gray-50 p-6 rounded-lg">
+                    <div key={index} className="bg-gray-50 p-6 rounded-lg hover:shadow-md transition-shadow">
                       <h3 className="font-bold text-gray-900 mb-2">{item.title}</h3>
                       <p className="text-sm text-gray-600">{item.desc}</p>
                     </div>
                   ))}
                 </div>
 
-                <Link 
-                  href="/contact"
-                  className="inline-flex items-center bg-yellow-500 text-white px-8 py-4 rounded-lg font-semibold hover:bg-yellow-600 transition-colors"
+                {/* <Link 
+                  href="/Contact"
+                  className="inline-flex items-center bg-yellow-500 text-white px-8 py-4 rounded-lg font-semibold hover:bg-yellow-600 transition-colors group"
                 >
                   Schedule Virtual Appointment
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Link>
+                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link> */}
               </div>
             </div>
           )}
@@ -523,17 +623,23 @@ export default function LocationPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-16">
+      <section className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Meet Our Team?</h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
             Schedule a free consultation at any of our locations or request a virtual meeting
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/contact" className="bg-yellow-500 text-white px-8 py-4 rounded-lg font-semibold hover:bg-yellow-600 transition-colors">
+            <Link 
+              href="/Contact" 
+              className="bg-yellow-500 text-white px-8 py-4 rounded-lg font-semibold hover:bg-yellow-600 transition-colors transform hover:scale-105 duration-300"
+            >
               Book an Appointment
             </Link>
-            <Link href="/services" className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white hover:text-gray-900 transition-colors">
+            <Link 
+              href="/Services" 
+              className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white hover:text-gray-900 transition-colors transform hover:scale-105 duration-300"
+            >
               Explore Services
             </Link>
           </div>
